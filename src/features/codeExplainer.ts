@@ -638,14 +638,6 @@ class CodeExplainerViewProvider implements vscode.WebviewViewProvider {
             </div>
           </div>
 
-          <!-- Score Bars -->
-          <div class="section">
-            <div class="sec-head">
-              <div class="sec-title"><i class="codicon codicon-pulse"></i> Quality Scores</div>
-            </div>
-            <div id="scoreBars"></div>
-          </div>
-
           <!-- Insights -->
           <div class="section">
             <div class="sec-head">
@@ -729,7 +721,6 @@ class CodeExplainerViewProvider implements vscode.WebviewViewProvider {
       mComp: $("mComp"), mCompDesc: $("mCompDesc"),
       mCyc: $("mCyc"), mNest: $("mNest"), mMaint: $("mMaint"),
       mCog: $("mCog"), mSmells: $("mSmells"),
-      scoreBars: $("scoreBars"),
       insights: $("insightsList"),
       sumText: $("sumText"),
       detText: $("detText"),
@@ -825,27 +816,6 @@ class CodeExplainerViewProvider implements vscode.WebviewViewProvider {
 
     function getInsIcon(t) { return INS_ICONS[t] || "codicon-info"; }
 
-    function makeScoreBars(metrics) {
-      const scores = [
-        { label: "Maintainability", val: metrics.maintainabilityIndex, max: 100, pct: metrics.maintainabilityIndex },
-        { label: "Comment density", val: Math.round(metrics.commentDensity) + "%", max: 100, pct: metrics.commentDensity },
-        { label: "Cyclomatic", val: metrics.cyclomatic, max: 20, pct: Math.min(100, (metrics.cyclomatic / 20) * 100), invert: true },
-        { label: "Cognitive", val: metrics.cognitiveComplexity, max: 30, pct: Math.min(100, (metrics.cognitiveComplexity / 30) * 100), invert: true },
-        { label: "Nesting depth", val: metrics.nestingDepth, max: 8, pct: Math.min(100, (metrics.nestingDepth / 8) * 100), invert: true },
-      ];
-
-      return scores.map(s => {
-        const level = s.invert
-          ? (s.pct > 65 ? "high" : s.pct > 35 ? "medium" : "low")
-          : (s.pct > 65 ? "low" : s.pct > 35 ? "medium" : "high");
-        return '<div class="score-row">' +
-          '<span class="score-label">' + esc(s.label) + '</span>' +
-          '<div class="score-bar-wrap"><div class="score-bar-fill ' + level + '" style="width:' + s.pct.toFixed(1) + '%"></div></div>' +
-          '<span class="score-val">' + esc(String(s.val)) + '</span>' +
-        '</div>';
-      }).join("");
-    }
-
     // ── EVENT HANDLERS ──
     els.refresh.onclick = () => vscode.postMessage({ type: "refreshSelection" });
     els.retry.onclick = () => vscode.postMessage({ type: "refreshSelection" });
@@ -917,9 +887,6 @@ class CodeExplainerViewProvider implements vscode.WebviewViewProvider {
         els.mCog.className = "card-val " + (met.cognitiveComplexity <= 5 ? "low" : met.cognitiveComplexity <= 15 ? "medium" : "high");
         els.mSmells.textContent = met.codeSmells;
         els.mSmells.className = "card-val " + (met.codeSmells === 0 ? "low" : met.codeSmells <= 3 ? "medium" : "high");
-
-        // Score bars
-        els.scoreBars.innerHTML = makeScoreBars(met);
 
         // Pattern tags
         els.patternTags.innerHTML = d.patterns.slice(0, 10).map(p =>

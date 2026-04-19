@@ -3,6 +3,17 @@ import { createLogger } from "../utils/logger";
 
 const logger = createLogger("Dev Toolkit");
 
+export interface RemoveConsoleLogsOptions {
+  scope?: "auto" | "file" | "selection";
+  selection?: vscode.Selection;
+  formatAfterCleanup?: boolean;
+}
+
+export interface RemoveConsoleLogsResult {
+  changed: boolean;
+  scope: "file" | "selection";
+}
+
 export function registerRemoveConsoleLogs(context: vscode.ExtensionContext) {
   const command = vscode.commands.registerCommand("devToolkit.removeConsoleLogs", async () => {
     const editor = vscode.window.activeTextEditor;
@@ -11,32 +22,58 @@ export function registerRemoveConsoleLogs(context: vscode.ExtensionContext) {
       return;
     }
 
-    const selection = editor.selection;
-    const originalText = selection.isEmpty ? editor.document.getText() : editor.document.getText(selection);
-    const cleanedText = removeConsoleLogs(originalText);
+    const result = await removeConsoleLogsFromEditor(editor, {
+      scope: "auto",
+      formatAfterCleanup: true
+    });
 
-    if (cleanedText === originalText) {
+    if (!result.changed) {
       vscode.window.showInformationMessage("No console.* statements found.");
       return;
     }
 
-    const editRange = selection.isEmpty
-      ? new vscode.Range(new vscode.Position(0, 0), editor.document.lineAt(editor.document.lineCount - 1).range.end)
-      : selection;
-
-    const editSuccess = await editor.edit((editBuilder) => {
-      editBuilder.replace(editRange, cleanedText);
-    });
-
-    if (editSuccess) {
-      await vscode.commands.executeCommand("editor.action.formatDocument");
-    }
-
     vscode.window.showInformationMessage("Removed console.* statements.");
-    logger.info("RemoveConsoleLogs", selection.isEmpty ? "Removed from active file" : "Removed from selection");
+    logger.info("RemoveConsoleLogs", result.scope === "file" ? "Removed from active file" : "Removed from selection");
   });
 
   context.subscriptions.push(command);
+}
+
+export async function removeConsoleLogsFromEditor(
+  editor: vscode.TextEditor,
+  options: RemoveConsoleLogsOptions = {}
+): Promise<RemoveConsoleLogsResult> {
+  const scope = options.scope ?? "auto";
+  const selection = options.selection ?? editor.selection;
+  const applyToSelection = scope === "selection" || (scope === "auto" && !selection.isEmpty);
+  const targetScope: "file" | "selection" = applyToSelection ? "selection" : "file";
+
+  const originalText = applyToSelection ? editor.document.getText(selection) : editor.document.getText();
+  const cleanedText = removeConsoleLogs(originalText);
+
+  if (cleanedText === originalText) {
+    return { changed: false, scope: targetScope };
+  }
+
+  const editRange = applyToSelection ? selection : getFullDocumentRange(editor.document);
+  const editSuccess = await editor.edit((editBuilder) => {
+    editBuilder.replace(editRange, cleanedText);
+  });
+
+  if (!editSuccess) {
+    return { changed: false, scope: targetScope };
+  }
+
+  if (options.formatAfterCleanup) {
+    await vscode.commands.executeCommand("editor.action.formatDocument");
+  }
+
+  return { changed: true, scope: targetScope };
+}
+
+function getFullDocumentRange(document: vscode.TextDocument): vscode.Range {
+  const lastLine = document.lineAt(document.lineCount - 1);
+  return new vscode.Range(new vscode.Position(0, 0), lastLine.range.end);
 }
 
 function removeConsoleLogs(text: string): string {

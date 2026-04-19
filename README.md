@@ -7,6 +7,8 @@ Dev Toolkit is a VS Code extension with essential developer utilities.
 - **File Size Viewer** - Display individual file sizes with human-readable formatting in a status bar
 - **Explorer Size Decorations** - View file and folder sizes directly in the Explorer with tooltips showing size and file count
 - **Console Log Remover** - Remove all `console.*` statements from JavaScript/TypeScript files or selected text
+- **Unused Import Remover** - Remove unused imports in JavaScript/TypeScript files with one command
+- **One-Click Project Cleanup** - Run common hygiene fixes in one action: remove `console.*`, remove unused imports, and trim trailing whitespace
 - **Function Reference Tracker** - Locate and display references to functions across your workspace for fast navigation and analysis
 - **Code Explainer** - Explain selected code with an AI-enhanced view panel and an editor command for quick context-aware insights
 - **Read Time Estimator** - Show estimated read time for JavaScript, TypeScript, and Markdown files in the status bar

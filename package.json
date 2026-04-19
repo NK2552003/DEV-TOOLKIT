@@ -75,6 +75,16 @@
         "icon": "$(trash)"
       },
       {
+        "command": "devToolkit.removeUnusedImports",
+        "title": "Dev Toolkit: Remove Unused Imports",
+        "icon": "$(symbol-namespace)"
+      },
+      {
+        "command": "devToolkit.projectCleanup",
+        "title": "Dev Toolkit: One-Click Project Cleanup",
+        "icon": "$(clear-all)"
+      },
+      {
         "command": "devToolkit.explainSelectedCode",
         "title": "Dev Toolkit: Explain Selected Code",
         "icon": "$(book)"
@@ -107,6 +117,14 @@
         {
           "command": "devToolkit.refreshReferences",
           "when": "editorLangId == 'javascript' || editorLangId == 'typescript' || editorLangId == 'javascriptreact' || editorLangId == 'typescriptreact'"
+        },
+        {
+          "command": "devToolkit.removeUnusedImports",
+          "when": "editorTextFocus && !editorReadonly && (editorLangId == 'javascript' || editorLangId == 'typescript' || editorLangId == 'javascriptreact' || editorLangId == 'typescriptreact')"
+        },
+        {
+          "command": "devToolkit.projectCleanup",
+          "when": "editorTextFocus && !editorReadonly && (editorLangId == 'javascript' || editorLangId == 'typescript' || editorLangId == 'javascriptreact' || editorLangId == 'typescriptreact')"
         }
       ],
       "explorer/context": [
@@ -127,6 +145,15 @@
         {
           "command": "devToolkit.removeConsoleLogs",
           "when": "editorTextFocus && !editorReadonly"
+        },
+        {
+          "command": "devToolkit.removeUnusedImports",
+          "when": "editorTextFocus && !editorReadonly && (editorLangId == 'javascript' || editorLangId == 'typescript' || editorLangId == 'javascriptreact' || editorLangId == 'typescriptreact')"
+        },
+        {
+          "command": "devToolkit.projectCleanup",
+          "when": "editorTextFocus && !editorReadonly && (editorLangId == 'javascript' || editorLangId == 'typescript' || editorLangId == 'javascriptreact' || editorLangId == 'typescriptreact')",
+          "group": "modification"
         },
         {
           "command": "devToolkit.explainSelectedCode",

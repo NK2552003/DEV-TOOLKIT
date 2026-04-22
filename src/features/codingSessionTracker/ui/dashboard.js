@@ -1,14 +1,11 @@
 /**
  * Dev Toolkit — Session Tracker Dashboard
- * Implements: tabs, live strip, today stats, heatmap, goals ring,
- *             achievements engine, badge system, history chart, export.
  */
 (() => {
     'use strict';
 
     const vscode = acquireVsCodeApi();
 
-    // ── Persisted UI state ────────────────────────────────────────
     const uiState = vscode.getState() || { activeTab: 'today', goalMinutes: 120 };
 
     // ════════════════════════════════════════════════════════════════
@@ -48,7 +45,7 @@
     };
 
     // ════════════════════════════════════════════════════════════════
-    // BADGE DEFINITIONS  (Bronze → Silver → Gold → Platinum → Diamond)
+    // BADGE DEFINITIONS
     // ════════════════════════════════════════════════════════════════
     const BADGE_TIERS = ['none', 'bronze', 'silver', 'gold', 'platinum', 'diamond'];
     const BADGE_TIER_LABELS = ['—', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
@@ -57,8 +54,10 @@
         {
             id: 'code_clock', name: 'Code Clock', icon: 'codicon-watch',
             desc: 'Total active hours',
-            thresholds: [10, 50, 200, 500, 1000], // hours
+            thresholds: [10, 50, 200, 500, 1000],
             value: (h) => totalActiveHours(h),
+            // FIX: format to 1 decimal for hours
+            format: (v) => parseFloat(v.toFixed(1)),
             unit: 'h',
         },
         {
@@ -66,20 +65,23 @@
             desc: 'Consecutive coding days',
             thresholds: [3, 7, 30, 60, 100],
             value: (h) => maxDayStreak(h),
-            unit: 'days',
+            format: (v) => Math.round(v),
+            unit: ' days',
         },
         {
             id: 'focus_forge', name: 'Focus Forge', icon: 'codicon-zap',
             desc: 'Flow state sessions (25+ min streak)',
             thresholds: [5, 20, 50, 100, 250],
             value: (h) => h.filter(s => s.maxStreak >= 1500).length,
-            unit: 'sessions',
+            format: (v) => Math.round(v),
+            unit: ' sessions',
         },
         {
             id: 'iron_coder', name: 'Iron Coder', icon: 'codicon-shield',
             desc: '% of days coded in last 90 days',
             thresholds: [25, 50, 75, 90, 100],
             value: (h) => consistencyPct(h),
+            format: (v) => Math.round(v),
             unit: '%',
         },
     ];
@@ -123,7 +125,7 @@
     function currentDayStreak(history) {
         const days = Object.keys(sessionsByDay(history))
             .map(d => new Date(d).getTime())
-            .sort((a, b) => b - a); // descending
+            .sort((a, b) => b - a);
         if (!days.length) return 0;
         const today = new Date(); today.setHours(0, 0, 0, 0);
         let cur = 0, check = today.getTime();
@@ -140,7 +142,7 @@
         const byDay = sessionsByDay(history);
         const now = new Date();
         const y = now.getFullYear(), m = now.getMonth();
-        const days = new Date(y, m, 0).getDate(); // days in last month
+        const days = new Date(y, m, 0).getDate();
         for (let d = 1; d <= days; d++) {
             const key = new Date(y, m - 1, d).toDateString();
             if (!byDay[key]) return false;
@@ -231,7 +233,6 @@
     const panels     = document.querySelectorAll('.tab-panel');
     const liveStrip  = $('liveStrip');
 
-    // ── Tab navigation ────────────────────────────────────────────
     function activateTab(name) {
         tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
         panels.forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
@@ -246,7 +247,6 @@
     // RENDER FUNCTIONS
     // ════════════════════════════════════════════════════════════════
 
-    // ── Live strip ────────────────────────────────────────────────
     function renderLiveStrip(isTracking, efficiency, session, isIdle) {
         if (!isTracking) {
             liveStrip.classList.add('hidden');
@@ -265,7 +265,6 @@
                         'var(--vscode-testing-iconErrored, #f48771)';
     }
 
-    // ── Today tab ─────────────────────────────────────────────────
     function renderToday(history) {
         const hasData = history.length > 0;
         $('emptyToday').classList.toggle('hidden', hasData);
@@ -282,7 +281,6 @@
         $('todayFlow').textContent     = flowSec > 0 ? fmt(flowSec) : '—';
         $('todayStreak').textContent   = fmt(bestSt);
 
-        // All-time
         const allSec    = totalActiveSeconds(history);
         const allStreak = history.reduce((a, s) => Math.max(a, s.maxStreak), 0);
         const longest   = history.reduce((a, s) => Math.max(a, s.totalTime), 0);
@@ -299,22 +297,17 @@
         renderHeatmap(history);
     }
 
-    // ── Heatmap ───────────────────────────────────────────────────
     function renderHeatmap(history) {
         const container = $('heatmap');
         container.innerHTML = '';
 
-        // Build a map of day → totalActiveSeconds
         const byDay = {};
         history.forEach(s => {
             const key = new Date(s.date).toDateString();
             byDay[key] = (byDay[key] || 0) + s.activeTime;
         });
 
-        // Max for colour scaling
         const maxSec = Math.max(...Object.values(byDay), 1);
-
-        // 12 weeks = 84 days, rendered as 12 columns of 7
         const WEEKS = 12;
         const now   = new Date(); now.setHours(23, 59, 59, 999);
 
@@ -337,7 +330,7 @@
         }
     }
 
-    // ── Goals tab ─────────────────────────────────────────────────
+    // ── Goals tab — FIX: use setAttribute for SVG properties ──────
     function renderGoals(history, isTracking) {
         const goalSec    = (uiState.goalMinutes || 120) * 60;
         const codedSec   = todaySeconds(history);
@@ -350,21 +343,23 @@
         $('goalPct').textContent       = `${pct}%`;
         $('goalInput').value           = uiState.goalMinutes || 120;
 
-        // Ring: circumference = 2π × 42 ≈ 263.9
-        const circ = 263.9;
+        // FIX: use setAttribute instead of .style for SVG presentation attributes
+        const circ  = 263.9;
         const offset = circ - (pct / 100) * circ;
-        $('ringFill').style.strokeDashoffset = offset;
-        $('ringFill').style.stroke =
-            pct >= 100 ? 'var(--vscode-testing-iconPassed, #4caf50)' :
-                         'var(--vscode-focusBorder, #007acc)';
+        const ringFill = $('ringFill');
+        ringFill.setAttribute('stroke-dashoffset', offset);
+        ringFill.setAttribute('stroke',
+            pct >= 100
+                ? 'var(--vscode-testing-iconPassed, #4caf50)'
+                : 'var(--vscode-focusBorder, #007acc)'
+        );
 
-        // ETA
         if (isTracking && codedSec > 0 && remaining > 0) {
             const todaySessions = history.filter(s =>
                 new Date(s.date).toDateString() === new Date().toDateString()
             );
             const totalToday = todaySessions.reduce((a, s) => a + s.totalTime, 1);
-            const rate = codedSec / totalToday; // active fraction
+            const rate = codedSec / totalToday;
             const etaSec = remaining / Math.max(rate, 0.1);
             const eta = new Date(Date.now() + etaSec * 1000);
             $('goalEta').textContent = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -373,7 +368,7 @@
         }
     }
 
-    // ── Achievements tab ──────────────────────────────────────────
+    // ── Achievements ──────────────────────────────────────────────
     let prevUnlocked = new Set();
 
     function renderAchievements(history) {
@@ -410,7 +405,6 @@
 
         $('achCount').textContent = `${unlocked.size} / ${totalCount}`;
 
-        // Toast for newly unlocked
         unlocked.forEach(id => {
             if (!prevUnlocked.has(id) && prevUnlocked.size > 0) {
                 const all = [
@@ -425,26 +419,32 @@
         prevUnlocked = unlocked;
     }
 
-    // ── Badges tab ────────────────────────────────────────────────
+    // ── Badges — FIX: format values properly, add space before unit ─
     function renderBadges(history) {
         const grid = $('badgeGrid');
         grid.innerHTML = '';
 
         BADGES.forEach(badge => {
-            const val   = badge.value(history);
-            // Find tier index (0 = none, 1-5 = bronze–diamond)
+            const rawVal = badge.value(history);
+            const val    = badge.format ? badge.format(rawVal) : rawVal;
+
             let tier = 0;
             badge.thresholds.forEach((threshold, i) => {
-                if (val >= threshold) tier = i + 1;
+                if (rawVal >= threshold) tier = i + 1;
             });
 
             const nextThreshold = badge.thresholds[tier] ?? null;
             const prevThreshold = badge.thresholds[tier - 1] ?? 0;
             const progPct = nextThreshold
-                ? Math.min(100, Math.round(((val - prevThreshold) / (nextThreshold - prevThreshold)) * 100))
+                ? Math.min(100, Math.round(((rawVal - prevThreshold) / (nextThreshold - prevThreshold)) * 100))
                 : 100;
             const tierName  = BADGE_TIER_LABELS[tier];
             const tierClass = BADGE_TIERS[tier];
+
+            // Format thresholds for display too
+            const nextDisplay = nextThreshold !== null
+                ? (badge.format ? badge.format(nextThreshold) : nextThreshold)
+                : null;
 
             const card = document.createElement('div');
             card.className = `badge-card tier-${tierClass} ${tier > 0 ? 'earned' : ''}`;
@@ -463,7 +463,7 @@
                 </div>
                 <div class="badge-prog-label">
                     ${tier < 5
-                        ? `${val}${badge.unit} / ${nextThreshold}${badge.unit}`
+                        ? `${val}${badge.unit} / ${nextDisplay}${badge.unit}`
                         : 'Max tier reached'}
                 </div>
             `;
@@ -611,13 +611,11 @@
         }
     });
 
-    // Keep toggle button in sync with external state changes
     window.addEventListener('message', event => {
         if (event.data.type === 'history') {
             updateToggleBtn(event.data.isTracking ?? true);
         }
     });
 
-    // ── Initial request ───────────────────────────────────────────
     vscode.postMessage({ type: 'requestData' });
 })();

@@ -92,6 +92,7 @@ export function registerSessionTimer(context: vscode.ExtensionContext) {
   let isTracking = true;
   let autoPausedByFocusLoss = false;
   let tickCount = 0;
+  let flowStateNotified = false; // Guard so the flow state entry toast fires only once per streak
 
   const sessionStartTime = new Date();
   const sessionId = `session_${Date.now()}`; // Unique ID for persistence
@@ -155,11 +156,12 @@ export function registerSessionTimer(context: vscode.ExtensionContext) {
     publishSessionState(buildLiveState());
   };
 
-  const updateStatusBar = () => {
+  // Accept the precomputed statusBarFormat from the tick so we don't re-read config redundantly.
+  const updateStatusBar = (statusBarFormat?: string) => {
     const config = vscode.workspace.getConfiguration("devToolkit.sessionTracker");
     const dailyGoalSec = config.get<number>("dailyGoalMinutes", 120) * 60;
     const flowThresholdSec = config.get<number>("flowStateThresholdMinutes", 25) * 60;
-    const statusBarFormat = config.get<string>("statusBarFormat", "timeAndStreak");
+    const resolvedFormat = statusBarFormat ?? config.get<string>("statusBarFormat", "timeAndStreak");
     const notifBreakReminders = config.get<Record<string, boolean>>("notifications", {})?.breakReminders !== false;
 
     if (!isTracking) {
@@ -179,14 +181,14 @@ export function registerSessionTimer(context: vscode.ExtensionContext) {
     else if (isFlowState) icon = "$(zap)";
 
     // Build text based on format setting
-    if (statusBarFormat === "iconOnly") {
+    if (resolvedFormat === "iconOnly") {
       statusBarItem.text = icon;
     } else {
       let suffix = "";
-      if (statusBarFormat === "timeAndStreak") {
+      if (resolvedFormat === "timeAndStreak") {
         const streak = currentDayStreak_internal();
         if (streak > 1) suffix = `  $(flame) ${streak}d`;
-      } else if (statusBarFormat === "timeAndLanguage") {
+      } else if (resolvedFormat === "timeAndLanguage") {
         const lang = vscode.window.activeTextEditor?.document.languageId ?? "";
         if (lang) suffix = `  ${lang}`;
       }
@@ -344,10 +346,13 @@ export function registerSessionTimer(context: vscode.ExtensionContext) {
     const idleThresholdMin = config.get<number>("idleThresholdMinutes", 2);
     const idleThreshold = idleThresholdMin * 60 * 1000;
     const breakInterval = config.get<number>("breakReminderInterval", 45);
+    // FIX 1: flowThresholdSeconds is now used to fire a one-time flow state entry notification.
     const flowThresholdSeconds = config.get<number>("flowStateThresholdMinutes", 25) * 60;
     const dailyGoalSec = config.get<number>("dailyGoalMinutes", 120) * 60;
+    // FIX 2: statusBarFormat is now forwarded to updateStatusBar, avoiding a redundant config re-read.
     const statusBarFormat = config.get<string>("statusBarFormat", "timeAndStreak");
     const notifGoalReached = config.get<Record<string, boolean>>("notifications", {})?.goalReminders !== false;
+    // FIX 3: notifBreakReminders now correctly guards the break reminder notification in the tick.
     const notifBreakReminders = config.get<Record<string, boolean>>("notifications", {})?.breakReminders !== false;
 
     const currentTime = Date.now();
@@ -371,9 +376,18 @@ export function registerSessionTimer(context: vscode.ExtensionContext) {
         maxStreakSeconds = streakSeconds;
       }
 
+      // FIX 1 (cont.): Notify the user exactly once when they enter flow state for this streak.
+      if (streakSeconds === flowThresholdSeconds && !flowStateNotified) {
+        flowStateNotified = true;
+        const flowMin = Math.round(flowThresholdSeconds / 60);
+        vscode.window.showInformationMessage(
+          `⚡ Flow state activated! You've been focused for ${flowMin} minutes straight.`
+        );
+      }
+
       // Healthy Habit: Break Reminder Control
-      // Triggered when current focus streak reaches the configured interval
-      if (streakSeconds > 0 && streakSeconds % (breakInterval * 60) === 0) {
+      // FIX 3 (cont.): Only fire the break notification when the user has it enabled.
+      if (notifBreakReminders && streakSeconds > 0 && streakSeconds % (breakInterval * 60) === 0) {
         needsBreak = true;
         vscode.window.showInformationMessage(
           `🕒 You've been focused for ${breakInterval} minutes! Time to take a quick break to recharge your energy.`,
@@ -381,6 +395,7 @@ export function registerSessionTimer(context: vscode.ExtensionContext) {
         ).then(selection => {
           if (selection === "I'll take a break") {
             streakSeconds = 0; // Incentivize break by resetting streak
+            flowStateNotified = false; // Allow flow state notification again after a real break
             needsBreak = false;
           }
         });
@@ -388,10 +403,12 @@ export function registerSessionTimer(context: vscode.ExtensionContext) {
     } else {
       isIdle = true;
       streakSeconds = 0; // Reset streak on idle
+      flowStateNotified = false; // Reset so the notification fires again on the next streak
       needsBreak = false;
     }
 
-    updateStatusBar();
+    // FIX 2 (cont.): Pass the already-read statusBarFormat so updateStatusBar skips re-reading it.
+    updateStatusBar(statusBarFormat);
     pushLiveUpdate();
 
     // Persist regularly so the sidebar graph stays close to real-time.

@@ -4,6 +4,11 @@
   "description": "Developer utilities: file size display, console log removal, AI-enhanced code explanation, reference tracking, session productivity tracking, and clipboard security scanning",
   "version": "1.3.0",
   "publisher": "sidkr222003",
+  "icon": "resources/dev-toolkit.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sidkr222003/dev-toolkit"
+  },
   "engines": {
     "vscode": "^1.93.0"
   },
@@ -11,6 +16,25 @@
     "Other",
     "Education",
     "Programming Languages"
+  ],
+  "keywords": [
+    "security",
+    "secrets",
+    "linter",
+    "clipboard",
+    "paste",
+    "scanner",
+    "api keys",
+    "credentials",
+    "enterprise",
+    "policy",
+    "compliance",
+    "audit",
+    "history",
+    "secret management",
+    "custom patterns",
+    "pii",
+    "vulnerability"
   ],
   "activationEvents": [
     "onStartupFinished",
@@ -23,15 +47,19 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -w -p ./"
+    "watch": "tsc -w -p ./",
+    "package": "npx @vscode/vsce package",
+    "publish": "npx @vscode/vsce publish"
   },
   "dependencies": {
     "@babel/parser": "^7.29.2",
     "@babel/types": "^7.29.0",
     "@vscode/codicons": "^0.0.45",
+    "minimatch": "^9.0.9",
     "typescript": "^5.5.0"
   },
   "devDependencies": {
+    "@types/minimatch": "^5.1.2",
     "@types/node": "^20.19.39",
     "@types/vscode": "^1.93.0"
   },
@@ -152,6 +180,12 @@
           "description": "Enable or disable PasteShield clipboard scanning.",
           "scope": "window"
         },
+        "pasteShield.silentMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable silent mode: scan clipboard and log to sidebar without blocking paste. Ideal for new users who want visibility without interruption.",
+          "scope": "window"
+        },
         "pasteShield.ignoredPatterns": {
           "type": "array",
           "items": { "type": "string" },
@@ -197,6 +231,158 @@
           "default": [],
           "markdownDescription": "Additional file basenames to exclude from CodeLens scanning (e.g. `[\".env.production\", \".env.staging\"]`). Note: paste interception is always skipped for `.env` and `.env.local` regardless of this list.",
           "scope": "resource"
+        },
+        "pasteShield.enableHistory": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable persistent scan history tracking in the sidebar.",
+          "scope": "window"
+        },
+        "pasteShield.autoRefreshHistory": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh the history view when new scans are completed.",
+          "scope": "window"
+        },
+        "pasteShield.workspaceIgnoreFile": {
+          "type": "string",
+          "default": ".pasteshieldignore",
+          "markdownDescription": "Name of the workspace-level ignore pattern file (similar to `.gitignore`). Patterns in this file apply only to the current workspace.",
+          "scope": "resource"
+        },
+        "pasteShield.useGitignorePatterns": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use patterns from `.gitignore` files to also ignore matching files from secret scanning.",
+          "scope": "resource"
+        },
+        "pasteShield.secretRotationReminderDays": {
+          "type": "number",
+          "default": 90,
+          "description": "Number of days after which to show a reminder to rotate detected secrets.",
+          "scope": "window"
+        },
+        "pasteShield.enableAuditLogging": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable audit logging for compliance reporting. Logs all detections and actions taken.",
+          "scope": "machine"
+        },
+        "pasteShield.auditLogPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Custom path for audit log export. Leave empty to use default VS Code storage. Supports absolute paths.",
+          "scope": "machine"
+        },
+        "pasteShield.customPatterns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Unique name for this pattern"
+              },
+              "regex": {
+                "type": "string",
+                "description": "Regular expression pattern"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["critical", "high", "medium", "low"],
+                "description": "Severity level"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of what this pattern detects"
+              },
+              "category": {
+                "type": "string",
+                "description": "Category for grouping (e.g., 'Custom', 'Company-Specific')"
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable or disable this pattern"
+              }
+            },
+            "required": ["name", "regex", "severity"]
+          },
+          "default": [],
+          "markdownDescription": "Custom user-defined regex patterns with severity levels. Each pattern must have a unique name, valid regex, and severity.",
+          "scope": "application"
+        },
+        "pasteShield.secretManagerProvider": {
+          "type": "string",
+          "default": "none",
+          "enum": ["none", "vault", "aws", "azure", "gcp"],
+          "enumDescriptions": [
+            "No secret manager configured — detected secrets are stored in VS Code SecretStorage (OS keychain)",
+            "HashiCorp Vault — credentials are stored securely via VS Code SecretStorage",
+            "AWS Secrets Manager — credentials are stored securely via VS Code SecretStorage",
+            "Azure Key Vault — credentials are stored securely via VS Code SecretStorage",
+            "Google Secret Manager — credentials are stored securely via VS Code SecretStorage"
+          ],
+          "description": "Select the secret management provider. All provider credentials are stored via VS Code SecretStorage (OS-level keychain) — never in settings.json.",
+          "scope": "application"
+        },
+        "pasteShield.vaultUrl": {
+          "type": "string",
+          "default": "",
+          "description": "HashiCorp Vault server URL (e.g., https://vault.example.com:8200)",
+          "scope": "application"
+        },
+        "pasteShield.awsRegion": {
+          "type": "string",
+          "default": "us-east-1",
+          "description": "AWS region for Secrets Manager",
+          "scope": "application"
+        },
+        "pasteShield.azureVaultUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Azure Key Vault URL (e.g., https://myvault.vault.azure.net/)",
+          "scope": "application"
+        },
+        "pasteShield.gcpProjectId": {
+          "type": "string",
+          "default": "",
+          "description": "Google Cloud Project ID for Secret Manager",
+          "scope": "application"
+        },
+        "pasteShield.enterpriseMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable enterprise mode for team-wide policy enforcement",
+          "scope": "machine"
+        },
+        "pasteShield.teamPolicyUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "URL to a shared `.pasteshield-policy.json` file (e.g. hosted on GitHub). Updates propagate to all team members automatically. Enables sticky enterprise tier.",
+          "scope": "machine"
+        },
+        "pasteShield.teamMembers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "email": { "type": "string" },
+              "name": { "type": "string" },
+              "role": {
+                "type": "string",
+                "enum": ["admin", "developer", "auditor"]
+              },
+              "groups": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "default": [],
+          "description": "Team members configuration for enterprise deployments",
+          "scope": "machine"
         }
       }
     },
@@ -224,6 +410,14 @@
           "type": "webview",
           "name": "Session Tracker",
           "icon": "$(pulse)"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "pasteShieldHistory",
+          "name": "PasteShield History",
+          "icon": "$(history)",
+          "contextualTitle": "PasteShield"
         }
       ]
     },
@@ -363,6 +557,12 @@
         "icon": "$(output)"
       },
       {
+        "command": "pasteShield.showHistory",
+        "title": "Show History",
+        "category": "PasteShield",
+        "icon": "$(history)"
+      },
+      {
         "command": "pasteShield.codeLensDetails",
         "title": "Show Detection Details",
         "category": "PasteShield",
@@ -379,6 +579,90 @@
         "title": "Open Ignored Patterns Settings",
         "category": "PasteShield",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "pasteShield.refreshHistory",
+        "title": "Refresh History",
+        "category": "PasteShield",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "pasteShield.clearHistory",
+        "title": "Clear History",
+        "category": "PasteShield",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "pasteShield.exportHistoryJson",
+        "title": "Export History as JSON",
+        "category": "PasteShield",
+        "icon": "$(json)"
+      },
+      {
+        "command": "pasteShield.exportHistoryText",
+        "title": "Export History as Text",
+        "category": "PasteShield",
+        "icon": "$(file-text)"
+      },
+      {
+        "command": "pasteShield.showDetectionDetails",
+        "title": "Show Detection Details",
+        "category": "PasteShield",
+        "icon": "$(info)"
+      },
+      {
+        "command": "pasteShield.showStatistics",
+        "title": "Show Statistics Dashboard",
+        "category": "PasteShield",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "pasteShield.exportAuditLog",
+        "title": "Export Audit Log",
+        "category": "PasteShield",
+        "icon": "$(output)"
+      },
+      {
+        "command": "pasteShield.showRotationReminders",
+        "title": "Show Secret Rotation Reminders",
+        "category": "PasteShield",
+        "icon": "$(clock)"
+      },
+      {
+        "command": "pasteShield.addToWorkspaceIgnore",
+        "title": "Add to Workspace Ignore List",
+        "category": "PasteShield",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "pasteShield.manageCustomPatterns",
+        "title": "Manage Custom Patterns",
+        "category": "PasteShield",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "pasteShield.configureSecretManager",
+        "title": "Configure Secret Manager",
+        "category": "PasteShield",
+        "icon": "$(key)"
+      },
+      {
+        "command": "pasteShield.listStoredSecrets",
+        "title": "List Stored Secrets",
+        "category": "PasteShield",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "pasteShield.showEnterprisePolicy",
+        "title": "Show Enterprise Policy",
+        "category": "PasteShield",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "pasteShield.exportComplianceReport",
+        "title": "Export Compliance Report",
+        "category": "PasteShield",
+        "icon": "$(output)"
       }
     ],
 
@@ -415,6 +699,16 @@
         },
         { "command": "pasteShield.toggle" },
         { "command": "pasteShield.showLastReport" },
+        { "command": "pasteShield.showHistory" },
+        { "command": "pasteShield.showStatistics" },
+        { "command": "pasteShield.exportAuditLog" },
+        { "command": "pasteShield.showRotationReminders" },
+        { "command": "pasteShield.addToWorkspaceIgnore" },
+        { "command": "pasteShield.manageCustomPatterns" },
+        { "command": "pasteShield.configureSecretManager" },
+        { "command": "pasteShield.listStoredSecrets" },
+        { "command": "pasteShield.showEnterprisePolicy" },
+        { "command": "pasteShield.exportComplianceReport" },
         {
           "command": "pasteShield.codeLensDetails",
           "when": "false"
@@ -425,6 +719,18 @@
         },
         {
           "command": "pasteShield.codeLensFix",
+          "when": "false"
+        },
+        {
+          "command": "pasteShield.refreshHistory",
+          "when": "false"
+        },
+        {
+          "command": "pasteShield.clearHistory",
+          "when": "false"
+        },
+        {
+          "command": "pasteShield.showDetectionDetails",
           "when": "false"
         }
       ],
@@ -468,6 +774,10 @@
           "group": "references"
         },
         {
+          "submenu": "pasteShield.editorMenu",
+          "group": "9_cutcopypaste@5"
+        },
+        {
           "command": "pasteShield.toggle",
           "when": "editorTextFocus",
           "group": "pasteShield@1"
@@ -485,8 +795,82 @@
           "when": "editorLangId == 'javascript' || editorLangId == 'typescript' || editorLangId == 'javascriptreact' || editorLangId == 'typescriptreact'",
           "group": "navigation"
         }
+      ],
+
+      "pasteShield.editorMenu": [
+        {
+          "command": "pasteShield.paste",
+          "group": "1_paste@1"
+        },
+        {
+          "command": "pasteShield.toggle",
+          "group": "2_actions@1"
+        },
+        {
+          "command": "pasteShield.showLastReport",
+          "group": "2_actions@2"
+        },
+        {
+          "command": "pasteShield.showHistory",
+          "group": "2_actions@3"
+        },
+        {
+          "command": "pasteShield.showStatistics",
+          "group": "3_analysis@1"
+        },
+        {
+          "command": "pasteShield.manageCustomPatterns",
+          "group": "4_advanced@1"
+        },
+        {
+          "command": "pasteShield.configureSecretManager",
+          "group": "4_advanced@2"
+        },
+        {
+          "command": "pasteShield.showEnterprisePolicy",
+          "group": "4_advanced@3"
+        }
+      ],
+
+      "view/title": [
+        {
+          "command": "pasteShield.refreshHistory",
+          "when": "view == pasteShieldHistory",
+          "group": "navigation"
+        },
+        {
+          "command": "pasteShield.clearHistory",
+          "when": "view == pasteShieldHistory",
+          "group": "navigation"
+        },
+        {
+          "command": "pasteShield.exportHistoryJson",
+          "when": "view == pasteShieldHistory",
+          "group": "secondary"
+        },
+        {
+          "command": "pasteShield.exportHistoryText",
+          "when": "view == pasteShieldHistory",
+          "group": "secondary"
+        }
+      ],
+
+      "view/item/context": [
+        {
+          "command": "pasteShield.showLastReport",
+          "when": "view == pasteShieldHistory && viewItem == historyEntry",
+          "group": "inline"
+        }
       ]
     },
+
+    "submenus": [
+      {
+        "id": "pasteShield.editorMenu",
+        "label": "PasteShield",
+        "icon": "$(shield)"
+      }
+    ],
 
     "keybindings": [
       {
@@ -511,6 +895,45 @@
         "command": "pasteShield.paste",
         "key": "shift+insert",
         "when": "editorTextFocus"
+      }
+    ],
+
+    "colors": [
+      {
+        "id": "pasteShield.criticalForeground",
+        "description": "Foreground color for critical severity detections",
+        "defaults": {
+          "dark": "editorError.foreground",
+          "light": "editorError.foreground",
+          "highContrast": "errorForeground"
+        }
+      },
+      {
+        "id": "pasteShield.highForeground",
+        "description": "Foreground color for high severity detections",
+        "defaults": {
+          "dark": "editorWarning.foreground",
+          "light": "editorWarning.foreground",
+          "highContrast": "errorForeground"
+        }
+      },
+      {
+        "id": "pasteShield.mediumForeground",
+        "description": "Foreground color for medium severity detections",
+        "defaults": {
+          "dark": "editorInfo.foreground",
+          "light": "editorInfo.foreground",
+          "highContrast": "foreground"
+        }
+      },
+      {
+        "id": "pasteShield.lowForeground",
+        "description": "Foreground color for low severity detections",
+        "defaults": {
+          "dark": "descriptionForeground",
+          "light": "descriptionForeground",
+          "highContrast": "foreground"
+        }
       }
     ]
   }

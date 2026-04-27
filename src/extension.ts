@@ -8,9 +8,10 @@ import { registerReadTime } from "./features/readTime";
 import { registerCodeExplainer } from "./features/codeExplainer";
 import { registerFunctionReferences } from "./features/functionReferences";
 import { registerCodeStyleMood } from "./features/codeStyleMood";
-import { registerPasteShield } from './features/pasteShield/pasteShield';
+import { registerPasteShield } from "./features/pasteShield/pasteShield";
 import { registerSessionTimer } from "./features/codingSessionTracker/sessionTimer";
 import { registerSessionTracker } from "./features/codingSessionTracker/sessionTrackerView";
+import { registerPasteShieldCommands } from "./features/pasteShield/PasteshieldCommands";
 
 export function activate(context: vscode.ExtensionContext) {
   registerFileSize(context);
@@ -24,7 +25,10 @@ export function activate(context: vscode.ExtensionContext) {
   registerCodeStyleMood(context);
   registerSessionTimer(context);
   registerSessionTracker(context);
+
+  // PasteShield — core detection + command palette features
   registerPasteShield(context);
+  registerPasteShieldCommands(context);
 }
 
 export function deactivate(): void {}

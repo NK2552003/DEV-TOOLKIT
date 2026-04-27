@@ -12,6 +12,8 @@ export const CONFIG_SECTION = 'pasteShield';
 export interface PasteShieldConfig {
   /** Master on/off switch. */
   enabled: boolean;
+  /** Silent mode: scan without blocking paste (logs to sidebar only). */
+  silentMode: boolean;
   /** Pattern names (matching PatternDefinition.name) to skip during scanning. */
   ignoredPatterns: string[];
   /** Whether to show inline decorations at the paste point after a warned paste. */
@@ -26,6 +28,7 @@ export function getConfig(): PasteShieldConfig {
   const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
   return {
     enabled: cfg.get<boolean>('enabled', true),
+    silentMode: cfg.get<boolean>('silentMode', false),
     ignoredPatterns: cfg.get<string[]>('ignoredPatterns', []),
     showInlineDecorations: cfg.get<boolean>('showInlineDecorations', true),
     minimumSeverity: cfg.get<'critical' | 'high' | 'medium' | 'low'>('minimumSeverity', 'medium'),

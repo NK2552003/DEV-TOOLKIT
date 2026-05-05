@@ -13,6 +13,7 @@ import { registerSessionTimer } from "./features/codingSessionTracker/sessionTim
 import { registerSessionTracker } from "./features/codingSessionTracker/sessionTrackerView";
 import { registerPasteShieldCommands } from "./features/pasteShield/PasteshieldCommands";
 import { registerCommitScorer } from "./features/commitScrorer/commitScorer";
+import { registerFreshnessHeatmap } from "./features/freshnessHeatmap";
 
 export function activate(context: vscode.ExtensionContext) {
   registerFileSize(context);
@@ -31,6 +32,8 @@ export function activate(context: vscode.ExtensionContext) {
   registerPasteShield(context);
   registerPasteShieldCommands(context);
   registerCommitScorer(context);
+
+  registerFreshnessHeatmap(context);
 }
 
 export function deactivate(): void {}

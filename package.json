@@ -67,6 +67,95 @@
     "configuration": {
       "title": "Dev Toolkit",
       "properties": {
+        "devToolkit.freshnessHeatmap.enabled": {
+  "type": "boolean",
+  "default": false,
+  "description": "Enable the Freshness Heatmap. Colours every line by age, churn, or author using git blame."
+},
+"devToolkit.freshnessHeatmap.mode": {
+  "type": "string",
+  "default": "age",
+  "enum": ["age", "churn", "author"],
+  "enumDescriptions": [
+    "Colour lines by last-modification date (green → amber → red).",
+    "Colour lines by modification frequency — hot spots pulse red/amber.",
+    "Tint lines by contributor — each author gets a unique hue."
+  ],
+  "description": "Visual mode for the Freshness Heatmap."
+},
+"devToolkit.freshnessHeatmap.recentDays": {
+  "type": "number",
+  "default": 7,
+  "minimum": 1,
+  "maximum": 365,
+  "description": "Lines modified within this many days are 'recent' (green)."
+},
+"devToolkit.freshnessHeatmap.staleDays": {
+  "type": "number",
+  "default": 30,
+  "minimum": 1,
+  "maximum": 3650,
+  "description": "Lines not modified within this many days are 'stale' (red). Must exceed recentDays."
+},
+"devToolkit.freshnessHeatmap.zombieDays": {
+  "type": "number",
+  "default": 180,
+  "minimum": 30,
+  "maximum": 3650,
+  "description": "Consecutive lines older than this (days) are flagged as zombie code in the Problems panel."
+},
+"devToolkit.freshnessHeatmap.recentColor": {
+  "type": "string",
+  "default": "#4caf50",
+  "pattern": "^#[0-9a-fA-F]{6}$",
+  "description": "Hex colour for recently-modified lines."
+},
+"devToolkit.freshnessHeatmap.moderateColor": {
+  "type": "string",
+  "default": "#ff9800",
+  "pattern": "^#[0-9a-fA-F]{6}$",
+  "description": "Hex colour for moderately-aged lines."
+},
+"devToolkit.freshnessHeatmap.staleColor": {
+  "type": "string",
+  "default": "#f44336",
+  "pattern": "^#[0-9a-fA-F]{6}$",
+  "description": "Hex colour for stale lines."
+},
+"devToolkit.freshnessHeatmap.opacity": {
+  "type": "number",
+  "default": 0.12,
+  "minimum": 0.02,
+  "maximum": 0.5,
+  "description": "Background highlight opacity (0.02–0.5). Lower = subtler."
+},
+"devToolkit.freshnessHeatmap.maxLines": {
+  "type": "number",
+  "default": 10000,
+  "minimum": 100,
+  "maximum": 100000,
+  "description": "Skip decoration for files exceeding this line count (performance guard)."
+},
+"devToolkit.freshnessHeatmap.showStatusBar": {
+  "type": "boolean",
+  "default": true,
+  "description": "Show freshness score and grade in the status bar."
+},
+"devToolkit.freshnessHeatmap.showSparklines": {
+  "type": "boolean",
+  "default": true,
+  "description": "Render 8-week commit-frequency sparklines in the editor gutter."
+},
+"devToolkit.freshnessHeatmap.showInlayHints": {
+  "type": "boolean",
+  "default": true,
+  "description": "Show inline age and churn-count hints at the end of stale lines."
+},
+"devToolkit.freshnessHeatmap.showDiagnostics": {
+  "type": "boolean",
+  "default": true,
+  "description": "Emit zombie-code Diagnostic entries in the Problems panel."
+},
         "devToolkit.enableCopilotFallback": {
           "type": "boolean",
           "default": true,
@@ -501,6 +590,12 @@
           "type": "webview",
           "name": "Session Tracker",
           "icon": "$(pulse)"
+        },
+        {
+          "id": "devToolkit.freshnessDashboard",
+          "type": "webview",
+          "name": "Freshness Heatmap",
+          "icon": "$(flame)"
         }
       ],
       "explorer": [
@@ -513,6 +608,30 @@
       ]
     },
     "commands": [
+      {
+  "command": "devToolkit.toggleFreshnessHeatmap",
+  "title": "Toggle Freshness Heatmap",
+  "category": "Dev Toolkit",
+  "icon": "$(flame)"
+},
+{
+  "command": "devToolkit.refreshFreshnessHeatmap",
+  "title": "Refresh Freshness Heatmap",
+  "category": "Dev Toolkit",
+  "icon": "$(sync)"
+},
+{
+  "command": "devToolkit.cycleHeatmapMode",
+  "title": "Cycle Heatmap Mode (Age → Churn → Author)",
+  "category": "Dev Toolkit",
+  "icon": "$(symbol-color)"
+},
+{
+  "command": "devToolkit.openFreshnessDashboard",
+  "title": "Open Freshness Dashboard",
+  "category": "Dev Toolkit",
+  "icon": "$(graph)"
+},
       {
         "command": "devToolkit.showFileSize",
         "title": "Show File Size",
@@ -780,6 +899,10 @@
     ],
     "menus": {
       "commandPalette": [
+        { "command": "devToolkit.toggleFreshnessHeatmap"  },
+{ "command": "devToolkit.refreshFreshnessHeatmap" },
+{ "command": "devToolkit.cycleHeatmapMode"        },
+{ "command": "devToolkit.openFreshnessDashboard"  },
         {
           "command": "devToolkit.showFunctionReferences",
           "when": "false"
@@ -900,6 +1023,21 @@
       ],
       "editor/context": [
         {
+  "command": "devToolkit.toggleFreshnessHeatmap",
+  "when": "editorTextFocus",
+  "group": "freshnessHeatmap@1"
+},
+{
+  "command": "devToolkit.cycleHeatmapMode",
+  "when": "editorTextFocus",
+  "group": "freshnessHeatmap@2"
+},
+{
+  "command": "devToolkit.openFreshnessDashboard",
+  "when": "editorTextFocus",
+  "group": "freshnessHeatmap@3"
+},
+        {
           "command": "devToolkit.showFileSize",
           "when": "editorTextFocus"
         },
@@ -941,6 +1079,16 @@
         }
       ],
       "editor/title": [
+        {
+  "command": "devToolkit.toggleFreshnessHeatmap",
+  "when": "editorTextFocus",
+  "group": "navigation"
+},
+{
+  "command": "devToolkit.openFreshnessDashboard",
+  "when": "editorTextFocus",
+  "group": "navigation"
+},
         {
           "command": "devToolkit.refreshReferences",
           "when": "editorLangId == 'javascript' || editorLangId == 'typescript' || editorLangId == 'javascriptreact' || editorLangId == 'typescriptreact'",
@@ -1019,6 +1167,23 @@
       }
     ],
     "keybindings": [
+      {
+  "command": "devToolkit.toggleFreshnessHeatmap",
+  "key": "ctrl+shift+h",
+  "mac": "cmd+shift+h",
+  "when": "editorTextFocus"
+},
+{
+  "command": "devToolkit.cycleHeatmapMode",
+  "key": "ctrl+shift+m",
+  "mac": "cmd+shift+m",
+  "when": "editorTextFocus"
+},
+{
+  "command": "devToolkit.openFreshnessDashboard",
+  "key": "ctrl+shift+f9",
+  "mac": "cmd+shift+f9"
+},
       {
         "command": "devToolkit.explainSelectedCode",
         "key": "ctrl+shift+e",
